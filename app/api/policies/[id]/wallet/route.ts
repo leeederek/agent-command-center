@@ -54,19 +54,22 @@ export async function POST(
       agentWalletId: updatedPolicy.agentWalletId,
       message: 'Wallet created successfully',
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating wallet:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    const errorCause = error instanceof Error && error.cause instanceof Error ? error.cause.message : undefined
+    
     console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name,
-      cause: error.cause,
+      message: errorMessage,
+      stack: errorStack,
+      cause: errorCause,
     })
     return NextResponse.json(
       {
         error: 'Failed to create wallet',
-        message: error.message || 'Unknown error',
-        details: error.cause?.message || error.stack || 'No additional details',
+        message: errorMessage,
+        details: errorCause || errorStack || 'No additional details',
       },
       { status: 500 }
     )

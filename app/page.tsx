@@ -1,6 +1,6 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -21,6 +21,7 @@ export default function HomePage() {
   const router = useRouter()
   const [policies, setPolicies] = useState<Policy[]>([])
   const [loading, setLoading] = useState(true)
+  const [deletingPolicyId, setDeletingPolicyId] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -47,11 +48,36 @@ export default function HomePage() {
     }
   }
 
-  const calculateDailySpent = async (policyId: string) => {
-    // This would ideally be calculated server-side, but for now we'll show 0
-    // In production, add an API endpoint to calculate this
-    return 0
+  const handleDeletePolicy = async (policyId: string) => {
+    if (!confirm('Are you sure you want to delete this policy? This action cannot be undone.')) {
+      return
+    }
+
+    setDeletingPolicyId(policyId)
+    try {
+      const response = await fetch(`/api/policies/${policyId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        // Remove policy from local state
+        setPolicies(policies.filter(p => p.id !== policyId))
+      } else {
+        const error = await response.json()
+        alert(`Failed to delete policy: ${error.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error deleting policy:', error)
+      alert('An error occurred while deleting the policy')
+    } finally {
+      setDeletingPolicyId(null)
+    }
   }
+
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: '/auth/signin' })
+  }
+
 
   const getStatus = (expiresAt: string) => {
     return new Date(expiresAt) > new Date() ? 'Active' : 'Expired'
@@ -80,10 +106,16 @@ export default function HomePage() {
           <h1 className="text-3xl font-bold text-gray-900">
             Agent Permissions Dashboard
           </h1>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
             <span className="text-sm text-gray-600">
               Wallet: {session?.user?.cdpWalletId?.slice(0, 10)}...
             </span>
+            <button
+              onClick={handleLogout}
+              className="text-sm text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md hover:bg-gray-100"
+            >
+              Sign Out
+            </button>
             <Link
               href="/policies/new"
               className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
@@ -169,6 +201,14 @@ export default function HomePage() {
                     >
                       Activity
                     </Link>
+                    <button
+                      onClick={() => handleDeletePolicy(policy.id)}
+                      disabled={deletingPolicyId === policy.id}
+                      className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                      title="Delete policy"
+                    >
+                      {deletingPolicyId === policy.id ? '...' : '🗑️'}
+                    </button>
                   </div>
                 </div>
               )

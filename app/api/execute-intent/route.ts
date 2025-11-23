@@ -73,22 +73,8 @@ export async function POST(request: NextRequest) {
     const todayEnd = new Date()
     todayEnd.setUTCHours(23, 59, 59, 999)
 
-    const todaySpent = await db.agentActionLog.aggregate({
-      where: {
-        policyId: policy.id,
-        status: ActionStatus.ALLOWED,
-        createdAt: {
-          gte: todayStart,
-          lte: todayEnd,
-        },
-      },
-      _sum: {
-        // Note: We'll need to store amountUsd in logs for accurate calculation
-        // For now, we'll use a simplified approach
-      },
-    })
-
-    // For now, we'll calculate from rawRequest JSON
+    // Calculate daily budget spent from rawRequest JSON
+    // Note: In production, consider adding amountUsd field to AgentActionLog model for better performance
     // In production, add amountUsd field to AgentActionLog model
     const todayLogs = await db.agentActionLog.findMany({
       where: {
@@ -104,9 +90,9 @@ export async function POST(request: NextRequest) {
     let totalSpentToday = 0
     for (const log of todayLogs) {
       try {
-        const requestData = JSON.parse(log.rawRequest)
+        const requestData = JSON.parse(log.rawRequest) as ExecuteIntentRequest
         totalSpentToday += requestData.amountUsd || 0
-      } catch (e) {
+      } catch {
         // Ignore parse errors
       }
     }
@@ -219,18 +205,19 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         allowed: true,
-        txId: txResult.txId || txResult.id || 'pending',
+        txId: txResult.txId || 'pending',
         logId: log.id,
       })
-    } catch (tradeError: any) {
+    } catch (tradeError: unknown) {
       // Trade execution failed
+      const errorMessage = tradeError instanceof Error ? tradeError.message : 'Unknown error'
       const log = await db.agentActionLog.create({
         data: {
           policyId: policy.id,
           agentId,
           status: ActionStatus.BLOCKED,
           summary: 'Action blocked: Trade execution failed',
-          reason: `CDP Trade API error: ${tradeError.message || 'Unknown error'}`,
+          reason: `CDP Trade API error: ${errorMessage}`,
           rawRequest: JSON.stringify(body),
           source,
         },
@@ -239,16 +226,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           allowed: false,
-          reason: `Trade execution failed: ${tradeError.message || 'Unknown error'}`,
+          reason: `Trade execution failed: ${errorMessage}`,
           logId: log.id,
         },
         { status: 500 }
       )
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error executing intent:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
-      { error: 'Failed to execute intent', message: error.message },
+      { error: 'Failed to execute intent', message: errorMessage },
       { status: 500 }
     )
   }

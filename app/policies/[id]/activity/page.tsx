@@ -15,7 +15,7 @@ interface ActionLog {
 }
 
 export default function ActivityLogPage() {
-  const { data: session, status } = useSession()
+  const { status } = useSession()
   const router = useRouter()
   const params = useParams()
   const policyId = params.id as string
@@ -31,7 +31,7 @@ export default function ActivityLogPage() {
     if (status === 'authenticated') {
       fetchLogs()
     }
-  }, [status, router, policyId])
+  }, [status, router, policyId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchLogs = async () => {
     try {

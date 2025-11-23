@@ -25,7 +25,7 @@ async function checkWallets() {
   })
 
   console.log('\nPolicies with same wallet:')
-  const duplicateWallets = Array.from(walletCounts.entries()).filter(([_, count]) => count > 1)
+  const duplicateWallets = Array.from(walletCounts.entries()).filter(([, count]) => count > 1)
   if (duplicateWallets.length > 0) {
     duplicateWallets.forEach(([wallet, count]) => {
       const policiesWithWallet = policies.filter((p) => p.agentWalletId === wallet)

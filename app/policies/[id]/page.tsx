@@ -38,32 +38,33 @@ export default function PolicyDetailPage() {
   const [requestingFaucet, setRequestingFaucet] = useState<string | null>(null)
   const [faucetResult, setFaucetResult] = useState<string | null>(null)
   const [creatingWallet, setCreatingWallet] = useState(false)
-  const [balances, setBalances] = useState<any[]>([])
+  interface TokenBalance {
+    contractAddress: string
+    symbol: string
+    name: string
+    amount: string
+    rawAmount: string
+    decimals: number
+    network: string
+  }
+
+  const [balances, setBalances] = useState<TokenBalance[]>([])
   const [loadingBalances, setLoadingBalances] = useState(false)
   const [balanceError, setBalanceError] = useState<string | null>(null)
 
   useEffect(() => {
-    console.log('=== Policy Detail Page Effect ===')
-    console.log('Status:', status)
-    console.log('Params:', params)
-    console.log('Policy ID from params:', policyId)
-    console.log('Session user:', session?.user?.cdpWalletId)
-    
     if (status === 'unauthenticated') {
       router.push('/auth/signin')
       return
     }
 
     if (!policyId) {
-      console.error('Policy ID is missing from URL params!')
       setLoading(false)
       return
     }
 
     if (status === 'authenticated' && policyId) {
       // Reset state when policyId changes
-      console.log('Policy ID changed to:', policyId)
-      console.log('Resetting all state...')
       setPolicy(null)
       setLogs([])
       setBalances([]) // Clear balances when switching policies
@@ -75,62 +76,39 @@ export default function PolicyDetailPage() {
       // Fetch policy and logs for this specific policyId
       const fetchData = async () => {
         try {
-          console.log('Fetching policy for ID:', policyId)
           const response = await fetch(`/api/policies/${policyId}`, {
             cache: 'no-store', // Prevent caching
           })
           if (response.ok) {
             const policyData = await response.json()
-            console.log('=== Fetched Policy Data ===')
-            console.log('Policy ID:', policyData?.id)
-            console.log('Agent ID:', policyData?.agentId)
-            console.log('Wallet ID:', policyData?.agentWalletId)
-            console.log('Expected Policy ID:', policyId)
-            console.log('Match:', policyData?.id === policyId ? 'YES ✓' : 'NO ✗')
             
             // Verify we got the correct policy
             if (policyData.id !== policyId) {
-              console.error('❌ Policy ID mismatch! Expected:', policyId, 'Got:', policyData.id)
-              console.error('NOT setting policy - IDs do not match!')
               setPolicy(null)
               return
             }
             
-            console.log('✓ Setting policy with wallet:', policyData.agentWalletId)
             setPolicy(policyData)
           } else {
-            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-            console.error('Failed to fetch policy:', errorData)
-            
             // Fallback to fetching all policies
             const allPoliciesResponse = await fetch('/api/policies', {
               cache: 'no-store',
             })
             if (allPoliciesResponse.ok) {
               const policies = await allPoliciesResponse.json()
-              console.log(`Found ${policies.length} policies for user`)
               const found = policies.find((p: Policy) => p.id === policyId)
-              console.log('Fetched policy from list:', found)
-              console.log('Policy ID:', found?.id)
-              console.log('Wallet ID:', found?.agentWalletId)
               
               if (found && found.id !== policyId) {
-                console.error('Policy ID mismatch! Expected:', policyId, 'Got:', found.id)
-                console.error('NOT setting policy - IDs do not match!')
                 setPolicy(null)
                 return
               }
               
               if (found) {
-                console.log('Setting policy from list with wallet:', found.agentWalletId)
                 setPolicy(found)
               } else {
-                console.log(`Policy ${policyId} not found in user's policies list`)
-                console.log('Available policy IDs:', policies.map((p: Policy) => p.id))
                 setPolicy(null)
               }
             } else {
-              console.error('Failed to fetch policies list')
               setPolicy(null)
             }
           }
@@ -154,24 +132,18 @@ export default function PolicyDetailPage() {
       
       fetchData()
     }
-  }, [status, router, policyId, params])
+  }, [status, router, policyId])
 
   useEffect(() => {
     // Fetch balances when policy and wallet are available
-    console.log('=== Balance Effect ===')
-    console.log('Policy:', policy?.id)
-    console.log('Wallet ID:', policy?.agentWalletId)
-    console.log('Policy ID:', policyId)
-    
     if (policy?.agentWalletId && policy?.id === policyId) {
-      console.log('Policy wallet ID detected, fetching balances for:', policy.agentWalletId)
       // Pass wallet address explicitly to avoid closure issues
       fetchBalances(policy.agentWalletId)
     } else {
-      console.log('No wallet ID yet or policy mismatch, clearing balances...')
       setBalances([])
       setBalanceError(null)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [policy?.id, policy?.agentWalletId, policyId])
 
   const fetchBalances = async (expectedWalletAddress?: string) => {
@@ -179,71 +151,38 @@ export default function PolicyDetailPage() {
     const walletAddress = expectedWalletAddress || policy?.agentWalletId
     
     if (!walletAddress) {
-      console.log('No agentWalletId, skipping balance fetch')
       setBalances([])
       return
     }
 
     if (!policyId) {
-      console.error('No policyId available for balance fetch')
       return
     }
 
     setLoadingBalances(true)
     setBalanceError(null)
     try {
-      console.log('=== Fetching Balances ===')
-      console.log('Policy ID:', policyId)
-      console.log('Expected Wallet Address:', walletAddress)
       const response = await fetch(`/api/policies/${policyId}/balances`, {
         cache: 'no-store', // Prevent caching
       })
-      console.log('Balance response status:', response.status)
       
       if (response.ok) {
         const result = await response.json()
-        console.log('=== Balance API Response ===')
-        console.log('Success:', result.success)
-        console.log('API Wallet Address:', result.walletAddress)
-        console.log('Expected Wallet Address:', walletAddress)
-        console.log('Balances count:', result.balances?.length || 0)
-        console.log('Balances:', result.balances)
         
-        // CRITICAL: Verify we got balances for the correct wallet
+        // Verify we got balances for the correct wallet
         if (result.walletAddress !== walletAddress) {
-          console.error('❌ Wallet address mismatch! NOT setting balances!')
-          console.error('Expected:', walletAddress)
-          console.error('Got:', result.walletAddress)
-          console.error('Policy ID:', policyId)
           setBalanceError(`Wrong wallet! Expected ${walletAddress.slice(0, 8)}... but got ${result.walletAddress.slice(0, 8)}...`)
           setBalances([])
           return
         }
         
         // Verify policy state matches (if policy is loaded)
-        if (policy) {
-          if (result.walletAddress !== policy.agentWalletId) {
-            console.error('❌ Policy wallet mismatch! NOT setting balances!')
-            console.error('Policy wallet:', policy.agentWalletId)
-            console.error('Result wallet:', result.walletAddress)
-            console.error('Policy ID from state:', policy.id)
-            console.error('Policy ID from URL:', policyId)
-            setBalanceError(`Wallet mismatch: Policy shows ${policy.agentWalletId?.slice(0, 8)}... but API returned ${result.walletAddress.slice(0, 8)}...`)
-            setBalances([])
-            return
-          }
-          // Note: Policy ID mismatch can happen during state transitions
-          // If wallet matches, it's safe to proceed
-          if (policy.id !== policyId) {
-            console.warn('⚠️ Policy ID mismatch detected, but wallet matches. Policy may be stale.')
-            console.warn('Policy ID from state:', policy.id)
-            console.warn('Policy ID from URL:', policyId)
-            console.warn('Continuing since wallet address matches...')
-            // Don't block - wallet is correct, just log warning
-          }
+        if (policy && result.walletAddress !== policy.agentWalletId) {
+          setBalanceError(`Wallet mismatch: Policy shows ${policy.agentWalletId?.slice(0, 8)}... but API returned ${result.walletAddress.slice(0, 8)}...`)
+          setBalances([])
+          return
         }
         
-        console.log('✓ Wallet addresses match, setting balances')
         setBalances(result.balances || [])
         if (!result.balances || result.balances.length === 0) {
           setBalanceError('No tokens found in wallet. Request faucet funds to see balances.')
@@ -252,22 +191,16 @@ export default function PolicyDetailPage() {
         }
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        console.error('Failed to fetch balances:', errorData)
-        // Don't show "Policy ID mismatch" error - it's likely a false positive
         const errorMessage = errorData.error || errorData.message || 'Failed to fetch balances'
-        if (errorMessage.includes('Policy ID mismatch')) {
-          console.warn('Ignoring Policy ID mismatch error - likely false positive')
-          // Try to fetch balances anyway by using the policyId from URL
-          // The API should work correctly even if there's a warning
-          setBalanceError(null)
-        } else {
+        if (!errorMessage.includes('Policy ID mismatch')) {
           setBalanceError(errorMessage)
         }
         setBalances([])
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching balances:', error)
-      setBalanceError(error.message || 'Error fetching balances')
+      const errorMessage = error instanceof Error ? error.message : 'Error fetching balances'
+      setBalanceError(errorMessage)
       setBalances([])
     } finally {
       setLoadingBalances(false)
@@ -278,18 +211,13 @@ export default function PolicyDetailPage() {
     if (!policyId) return
     
     try {
-      console.log('Fetching policy for ID:', policyId)
       // Try fetching the specific policy first
       const response = await fetch(`/api/policies/${policyId}`)
       if (response.ok) {
         const policyData = await response.json()
-        console.log('Fetched policy:', policyData)
-        console.log('Policy ID:', policyData?.id)
-        console.log('Wallet ID:', policyData?.agentWalletId)
         
         // Verify we got the correct policy
         if (policyData.id !== policyId) {
-          console.error('Policy ID mismatch! Expected:', policyId, 'Got:', policyData.id)
           return
         }
         
@@ -300,12 +228,8 @@ export default function PolicyDetailPage() {
         if (allPoliciesResponse.ok) {
           const policies = await allPoliciesResponse.json()
           const found = policies.find((p: Policy) => p.id === policyId)
-          console.log('Fetched policy from list:', found)
-          console.log('Policy ID:', found?.id)
-          console.log('Wallet ID:', found?.agentWalletId)
           
           if (found && found.id !== policyId) {
-            console.error('Policy ID mismatch! Expected:', policyId, 'Got:', found.id)
             return
           }
           
@@ -367,8 +291,9 @@ export default function PolicyDetailPage() {
 
       // Refresh logs
       fetchLogs()
-    } catch (error: any) {
-      alert(`Error: ${error.message}`)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
+      alert(`Error: ${errorMessage}`)
     } finally {
       setExecuting(false)
     }
@@ -389,7 +314,6 @@ export default function PolicyDetailPage() {
       })
 
       const result = await response.json()
-      console.log('Faucet response:', result)
 
       if (response.ok) {
         setFaucetResult(
@@ -397,7 +321,6 @@ export default function PolicyDetailPage() {
         )
         // Refresh balances after successful faucet request
         setTimeout(() => {
-          console.log('Refreshing balances after faucet request...')
           // Pass the wallet address explicitly
           if (policy?.agentWalletId) {
             fetchBalances(policy.agentWalletId)
@@ -406,9 +329,10 @@ export default function PolicyDetailPage() {
       } else {
         setFaucetResult(`Error: ${result.error || result.message}`)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Faucet request error:', error)
-      setFaucetResult(`Error: ${error.message}`)
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
+      setFaucetResult(`Error: ${errorMessage}`)
     } finally {
       setRequestingFaucet(null)
     }
@@ -435,10 +359,7 @@ export default function PolicyDetailPage() {
         await fetchPolicy()
         // Also refresh the router to ensure UI updates
         router.refresh()
-        if (result.alreadyExists) {
-          // Wallet already existed, just refresh the UI
-          console.log('Wallet already exists, refreshing UI...')
-        } else {
+        if (!result.alreadyExists) {
           alert('Wallet created successfully!')
         }
       } else {
@@ -448,8 +369,9 @@ export default function PolicyDetailPage() {
         alert(`Error: ${errorMsg}`)
         console.error('Wallet creation error:', result)
       }
-    } catch (error: any) {
-      alert(`Error: ${error.message}`)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
+      alert(`Error: ${errorMessage}`)
       console.error('Wallet creation exception:', error)
     } finally {
       setCreatingWallet(false)
@@ -510,30 +432,28 @@ export default function PolicyDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
-        <div className="mb-6">
+        <div className="mb-6 flex justify-between items-center">
           <Link
             href="/"
             className="text-indigo-600 hover:text-indigo-700 mb-4 inline-block"
           >
             ← Back to Policies
           </Link>
+          <Link
+            href={`/policies/${policyId}/edit`}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 text-sm"
+          >
+            Edit Policy
+          </Link>
         </div>
 
         {/* Agent Wallet Address Section */}
-        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg shadow-lg p-6 mb-6 text-white" key={`wallet-${policy.id}-${policy.agentWalletId}`}>
+        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg shadow-lg p-6 mb-6 text-white">
           <h2 className="text-lg font-semibold mb-3">Agent Wallet Address</h2>
-          <div className="text-xs text-white/70 mb-2 space-y-1">
-            <p>Policy ID: {policy.id}</p>
-            <p>Agent ID: {policy.agentId}</p>
-            <p>URL Policy ID: {policyId}</p>
-            {policy.id !== policyId && (
-              <p className="text-red-300 font-bold">⚠️ MISMATCH: Policy ID doesn't match URL!</p>
-            )}
-          </div>
           {policy.agentWalletId ? (
             <>
               <div className="flex items-center gap-4 mb-4">
-                <code className="bg-black/20 px-4 py-2 rounded-md font-mono text-sm flex-1 break-all" key={`wallet-addr-${policy.id}-${policy.agentWalletId}`}>
+                <code className="bg-black/20 px-4 py-2 rounded-md font-mono text-sm flex-1 break-all">
                   {policy.agentWalletId}
                 </code>
                 <button
@@ -618,8 +538,6 @@ export default function PolicyDetailPage() {
           ) : (
             <div className="text-center py-4">
               <p className="mb-4 text-white/90">No wallet created yet for this agent.</p>
-              <p className="mb-2 text-white/70 text-xs">Policy ID: {policy.id}</p>
-              <p className="mb-4 text-white/70 text-xs">Agent ID: {policy.agentId}</p>
               <button
                 onClick={handleCreateWallet}
                 disabled={creatingWallet || isExpired}

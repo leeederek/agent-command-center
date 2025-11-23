@@ -10,7 +10,13 @@ export function getCdpClient(): CdpClient {
     throw new Error('CDP_API_KEY_ID and CDP_API_KEY_SECRET must be set in environment variables')
   }
 
-  const options: any = {
+  interface CdpClientOptions {
+    apiKeyId: string
+    apiKeySecret: string
+    walletSecret?: string
+  }
+
+  const options: CdpClientOptions = {
     apiKeyId,
     apiKeySecret,
   }
@@ -94,11 +100,12 @@ export async function createAgentWallet(label: string) {
       id: account.address,
       address: account.address,
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('CDP createAccount error:', error)
     // Re-throw with more context
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     throw new Error(
-      `Failed to create CDP account: ${error.message || 'Unknown error'}. ` +
+      `Failed to create CDP account: ${errorMessage}. ` +
       `Make sure CDP_WALLET_SECRET is set in environment variables if required.`
     )
   }
@@ -134,7 +141,7 @@ export async function executeSwap(params: {
 
   // Create swap quote
   const swapQuote = await cdp.evm.createSwapQuote({
-    network: CDP_NETWORK as any,
+    network: CDP_NETWORK as 'base-sepolia' | 'ethereum-sepolia',
     fromToken,
     toToken,
     fromAmount,
@@ -190,7 +197,7 @@ export async function getTokenBalances(params: {
   network?: string
 }) {
   const cdp = getCdpClient()
-  const network = (params.network || CDP_NETWORK) as any
+  const network = (params.network || CDP_NETWORK) as 'base-sepolia' | 'ethereum-sepolia'
   
   // Get the account first
   const account = await cdp.evm.getAccount({
@@ -209,7 +216,20 @@ export async function getTokenBalances(params: {
   const balances = await networkAccount.listTokenBalances({})
 
   // Format balances for display
-  return balances.balances.map((balance: any) => {
+  interface TokenBalance {
+    amount: {
+      amount: bigint
+      decimals: number
+    }
+    token: {
+      contractAddress: string
+      symbol?: string
+      name?: string
+      network: string
+    }
+  }
+
+  return balances.balances.map((balance: TokenBalance) => {
     const amount = balance.amount.amount
     const decimals = balance.amount.decimals
     const divisor = BigInt(10 ** decimals)

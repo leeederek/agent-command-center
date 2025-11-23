@@ -1,13 +1,28 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import Link from 'next/link'
 
-export default function NewPolicyPage() {
+interface Policy {
+  id: string
+  agentId: string
+  dailyBudgetUsd: number
+  expiresAt: string
+  allowedTokens: string
+  allowedProtocols: string
+  allowedActions: string
+}
+
+export default function EditPolicyPage() {
   const { status } = useSession()
   const router = useRouter()
+  const params = useParams()
+  const policyId = params?.id as string | undefined
   const [loading, setLoading] = useState(false)
+  const [fetching, setFetching] = useState(true)
+  const [policy, setPolicy] = useState<Policy | null>(null)
   const [formData, setFormData] = useState({
     agentId: '',
     dailyBudgetUsd: '',
@@ -17,13 +32,71 @@ export default function NewPolicyPage() {
     expiryHours: '24',
   })
 
-  if (status === 'loading') {
-    return <div className="p-8">Loading...</div>
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin')
+      return
+    }
+
+    if (status === 'authenticated' && policyId) {
+      fetchPolicy()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, router, policyId])
+
+  const fetchPolicy = async () => {
+    if (!policyId) return
+
+    try {
+      const response = await fetch(`/api/policies/${policyId}`)
+      if (response.ok) {
+        const policyData = await response.json()
+        setPolicy(policyData)
+        
+        // Calculate hours until expiry
+        const expiresAt = new Date(policyData.expiresAt)
+        const now = new Date()
+        const hoursUntilExpiry = Math.max(1, Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60)))
+        
+        setFormData({
+          agentId: policyData.agentId,
+          dailyBudgetUsd: policyData.dailyBudgetUsd.toString(),
+          allowedTokens: JSON.parse(policyData.allowedTokens) as string[],
+          allowedProtocols: JSON.parse(policyData.allowedProtocols) as string[],
+          allowedActions: JSON.parse(policyData.allowedActions) as string[],
+          expiryHours: hoursUntilExpiry.toString(),
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching policy:', error)
+    } finally {
+      setFetching(false)
+    }
+  }
+
+  if (status === 'loading' || fetching) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-600">Loading...</div>
+      </div>
+    )
   }
 
   if (status === 'unauthenticated') {
-    router.push('/auth/signin')
     return null
+  }
+
+  if (!policy) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <p className="text-red-600 mb-4">Policy not found</p>
+          <Link href="/" className="text-indigo-600 hover:text-indigo-700">
+            ← Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   const handleTokenChange = (token: string) => {
@@ -58,8 +131,8 @@ export default function NewPolicyPage() {
     setLoading(true)
 
     try {
-      const response = await fetch('/api/policies', {
-        method: 'POST',
+      const response = await fetch(`/api/policies/${policyId}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
@@ -69,11 +142,10 @@ export default function NewPolicyPage() {
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || 'Failed to create policy')
+        throw new Error(error.error || 'Failed to update policy')
       }
 
-      await response.json()
-      router.push('/')
+      router.push(`/policies/${policyId}`)
       router.refresh()
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
@@ -86,9 +158,17 @@ export default function NewPolicyPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-2xl mx-auto px-4">
+        <div className="mb-6">
+          <Link
+            href={`/policies/${policyId}`}
+            className="text-indigo-600 hover:text-indigo-700 mb-4 inline-block"
+          >
+            ← Back to Policy
+          </Link>
+        </div>
         <div className="bg-white rounded-lg shadow-md p-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">
-            Create New Policy
+            Edit Policy
           </h1>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -196,20 +276,19 @@ export default function NewPolicyPage() {
                 htmlFor="expiryHours"
                 className="block text-sm font-medium text-gray-700 mb-2"
               >
-                Expiry
+                Expiry (hours from now)
               </label>
-              <select
+              <input
                 id="expiryHours"
+                type="number"
+                required
+                min="1"
                 value={formData.expiryHours}
                 onChange={(e) =>
                   setFormData({ ...formData, expiryHours: e.target.value })
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="24">24 hours</option>
-                <option value="168">7 days</option>
-                <option value="720">30 days</option>
-              </select>
+              />
             </div>
 
             <div className="flex gap-4">
@@ -218,7 +297,7 @@ export default function NewPolicyPage() {
                 disabled={loading}
                 className="flex-1 bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
               >
-                {loading ? 'Creating...' : 'Create Policy'}
+                {loading ? 'Updating...' : 'Update Policy'}
               </button>
               <button
                 type="button"

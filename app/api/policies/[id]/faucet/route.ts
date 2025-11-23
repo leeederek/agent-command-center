@@ -51,12 +51,13 @@ export async function POST(
       transactionHash: result.transactionHash,
       message: `Faucet request successful. Transaction: ${result.transactionHash}`,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error requesting faucet:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
       {
         error: 'Failed to request faucet',
-        message: error.message || 'Unknown error',
+        message: errorMessage,
       },
       { status: 500 }
     )

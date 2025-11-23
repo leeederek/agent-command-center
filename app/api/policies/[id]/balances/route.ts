@@ -98,12 +98,13 @@ export async function GET(
       balances,
       walletAddress: policy.agentWalletId,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching balances:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
       {
         error: 'Failed to fetch balances',
-        message: error.message || 'Unknown error',
+        message: errorMessage,
       },
       { status: 500 }
     )
