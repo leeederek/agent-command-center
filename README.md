@@ -1,55 +1,32 @@
-# Agent Permissions Dashboard
+# Agent Command Center (ACC)
 
-## Overview
+## High Level Overview
 
-**Agent Command Center (Firewall)** - A comprehensive platform for controlling and monitoring autonomous agent activities in decentralized finance (DeFi). This dashboard serves as a centralized firewall and command center where you can manage agent access, set spending limits, define allowed actions, and track all agent interactions using Coinbase Developer Platform (CDP) and x402 for access management.
+A centralized firewall and control panel for autonomous DeFi agents. It manages permissions, spending limits, allowed actions, and activity logs using the Coinbase Developer Platform (CDP) and (planned) x402 access control.
+
+## Motivation & rationale
+Autonomous agents are becoming increasingly common in decentralized finance, but most teams lack the infrastructure to control, monitor, and safely deploy these systems. Today, engineers often stitch together ad-hoc scripts, multisig checks, and custom logic just to prevent agents from overspending, interacting with the wrong protocols, or executing unintended transactions. This creates operational risk, inconsistent security guarantees, and a heavy maintenance burden. A centralized firewall-style dashboard solves these issues by giving teams one place to define budgets, permissions, allowed actions, and execution rules, ensuring agent behavior is tightly governed before anything touches the blockchain.
+
+Beyond security, visibility is another major pain point. Teams typically have no unified view of what their agents are doing, which policies they’re following, or which actions were blocked and why. Logs are fragmented across wallets, explorers, and internal tooling. This lack of observability becomes especially problematic as teams scale to multiple agents or introduce more complex strategies. A dedicated permissions dashboard consolidates all agent activity into a single audit layer, simplifying compliance, debugging, and incident response.
+
+This type of product has clear product-market fit with teams building autonomous DeFi agents, on-chain automation, trading bots, or agent-based applications that require strong guardrails and auditability. As the agent ecosystem grows, organizations will need standardized infrastructure to manage permissioning, prevent loss of funds, and maintain trust in autonomous execution. There is significant opportunity to become the default “agent operations layer,” integrate with leading agent frameworks, and expand into policy automation, compliance tooling, and enterprise-grade access control as the market matures.
 
 ### Purpose
 
-The Agent Permissions Dashboard addresses the critical need for secure, controlled, and auditable autonomous agent operations in blockchain environments. As DeFi agents become more prevalent, there's an increasing need for:
-
-- **Access Control**: Granular permission management for what agents can and cannot do
-- **Budget Management**: Daily spending limits to prevent excessive or unauthorized transactions
-- **Activity Monitoring**: Real-time tracking and logging of all agent actions
-- **Policy Enforcement**: Automated validation of agent intents before execution
-- **Wallet Management**: Dedicated wallet creation and funding for each agent
+- Enforce granular agent permissions
+- Set daily spending limits
+- Monitor all actions in real time
+- Validate intents before execution
+- Create and manage dedicated agent wallets
 
 ### Goals
-
-1. **Security First**: Provide a robust firewall that validates and blocks unauthorized agent actions before they reach the blockchain
-2. **Granular Control**: Enable fine-grained policy configuration including allowed tokens, protocols, actions, and spending limits
-3. **Transparency**: Maintain comprehensive audit logs of all agent activities (both allowed and blocked)
-4. **User-Friendly**: Offer an intuitive web interface for policy management and monitoring
-5. **Scalability**: Support multiple agents per user with isolated wallets and independent policies
-6. **Integration Ready**: Designed to work with x402 for advanced access management and CDP for blockchain operations
-
-## Technologies Used
-
-### Frontend
-- **Next.js 16** (App Router): React framework for server-side rendering and API routes
-- **React 19**: UI library for building interactive user interfaces
-- **Tailwind CSS 4**: Utility-first CSS framework for rapid UI development
-- **TypeScript**: Type-safe JavaScript for better code quality and developer experience
-
-### Backend
-- **Next.js API Routes**: Serverless API endpoints for handling business logic
-- **NextAuth.js**: Authentication and session management with credentials provider
-- **Prisma ORM**: Type-safe database client and migration tool
-- **SQLite**: Lightweight, file-based database for development and small-scale deployments
-
-### Blockchain & Infrastructure
-- **Coinbase Developer Platform (CDP) SDK**: Integration with CDP for:
-  - Server Wallet creation and management
-  - Token balance queries
-  - Swap execution via Trade API
-  - Faucet requests for testnet funding
-- **x402**: Access management system for controlling agent permissions (integration planned/ongoing)
-
-### Development Tools
-- **TypeScript**: Static type checking
-- **ESLint**: Code linting and quality assurance
-- **Prisma Studio**: Database GUI for data inspection and management
-
+- Block unauthorized actions before they reach the blockchain
+- Configure precise policy rules
+- Maintain transparent audit logs
+- Provide a simple web UI
+- Support multiple isolated agent wallets
+- Integrate with CDP and x402
+  
 ### Key Features
 
 - **User Authentication**: CDP wallet-based authentication
@@ -59,8 +36,6 @@ The Agent Permissions Dashboard addresses the critical need for secure, controll
 - **Dashboard UI**: View policies, activity logs, and manage agent permissions
 - **Wallet Management**: Create and fund dedicated wallets for each agent
 - **Balance Tracking**: Real-time token balance display for agent wallets
-
-## Setup
 
 ### Prerequisites
 
@@ -92,7 +67,7 @@ NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=your_nextauth_secret_here
 ```
 
-3. Generate Prisma client and run migrations:
+3. Generate Prisma client and run database migrations:
 ```bash
 npx prisma generate
 npx prisma migrate dev
@@ -103,7 +78,7 @@ npx prisma migrate dev
 npm run dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+5. Open [http://localhost:3000](http://localhost:3000)
 
 ## Usage
 
